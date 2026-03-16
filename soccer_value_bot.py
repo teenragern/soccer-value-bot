@@ -192,16 +192,26 @@ class FootballDataClient:
         })
         return data.get("matches", [])
 
-    def get_upcoming_matches(self, competition_code: str, days_ahead: int = 7) -> list:
-        """Return SCHEDULED matches for a competition in the next N days."""
-        today     = datetime.now(timezone.utc)
-        date_to   = today + timedelta(days=days_ahead)
-        data = self._get(f"/competitions/{competition_code}/matches", params={
-            "status":   "SCHEDULED",
-            "dateFrom": today.strftime("%Y-%m-%d"),
-            "dateTo":   date_to.strftime("%Y-%m-%d"),
-        })
-        return data.get("matches", [])
+    def get_upcoming_matches(self, competitions, days_ahead=3):
+        """Fetch scheduled matches for the provided list of leagues in ONE call."""
+        date_from = datetime.now().strftime("%Y-%m-%d")
+        date_to = (datetime.now() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+
+        try:
+            # Use the global /matches endpoint to fetch all leagues simultaneously
+            # This bypasses the 400 error and saves massive amounts of API quota
+            params = {
+                "competitions": ",".join(competitions),
+                "status": "SCHEDULED",
+                "dateFrom": date_from,
+                "dateTo": date_to
+            }
+            data = self._get("/matches", params=params)
+            return data.get("matches", [])
+
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"Error fetching upcoming matches: {e}")
+            return []
 
 
 # ─────────────────────────────────────────────────────────────────────────────
